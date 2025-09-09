@@ -160,10 +160,14 @@ func (f *Field) dfs(x, y int) {
 
 	f.remainTiles--
 
-	f.dfs(x+1, y)
-	f.dfs(x-1, y)
-	f.dfs(x, y+1)
-	f.dfs(x, y-1)
+	for i := -1; i <= 1; i++ {
+		for j := -1; j <= 1; j++ {
+			if i == 0 && j == 0 {
+				continue
+			}
+			f.dfs(x+i, y+j)
+		}
+	}
 }
 
 type Cursor struct {
