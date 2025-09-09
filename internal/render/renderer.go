@@ -23,7 +23,7 @@ func RenderField(field *game.Field) {
 	for r := range field.Rows {
 		for c := range field.Columns {
 			t := field.GetTile(c, r)
-			if field.Cursor.UnderCursor(c, r) {
+			if field.Cursor.IsCurrentTile(c, r) {
 				fmt.Printf(cellCursor, t.String())
 			} else {
 				fmt.Printf(cellNoCursor, t.String())

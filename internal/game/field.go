@@ -26,17 +26,13 @@ type Field struct {
 }
 
 func NewField(columns, rows int, percent int) *Field {
-	if percent >= 99 {
-		percent = 99
-	}
-	if percent < 1 {
-		percent = 1
-	}
+	percent = clamp(percent, 1, 100)
+	tileCount := columns * rows
 	return &Field{
 		Columns: columns,
 		Rows:    rows,
-		tiles:   make([]Tile, columns*rows),
-		mines:   columns * rows / 100 * percent,
+		tiles:   make([]Tile, tileCount),
+		mines:   tileCount / 100 * percent,
 		Cursor:  Cursor{columns, rows, 0, 0},
 	}
 }
@@ -95,7 +91,7 @@ func (f *Field) Randomize() {
 	cursorIndex := f.getSliceIndex(f.Cursor.GetPosition())
 	for range f.mines {
 		for {
-			j := rand.IntN(f.Columns * f.Rows)
+			j := rand.IntN(len(f.tiles) - 1)
 			if j == cursorIndex {
 				continue
 			}
@@ -167,25 +163,24 @@ type Cursor struct {
 
 func (c *Cursor) Move(x, y int) {
 	c.x += x
-	if c.x < 0 {
-		c.x = 0
-	}
-	if c.x >= c.limitX {
-		c.x = c.limitX - 1
-	}
+	c.x = clamp(c.x, 0, c.limitX)
 	c.y += y
-	if c.y < 0 {
-		c.y = 0
-	}
-	if c.y >= c.limitY {
-		c.y = c.limitY - 1
-	}
+	c.y = clamp(c.y, 0, c.limitY)
 }
 
-func (c *Cursor) GetPosition() (int, int) {
+func clamp(a, min, max int) int {
+	if a < min {
+		a = min
+	} else if a >= max {
+		a = max - 1
+	}
+	return a
+}
+
+func (c *Cursor) GetPosition() (x int, y int) {
 	return c.x, c.y
 }
 
-func (c *Cursor) UnderCursor(x, y int) bool {
+func (c *Cursor) IsCurrentTile(x, y int) bool {
 	return c.x == x && c.y == y
 }
