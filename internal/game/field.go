@@ -145,9 +145,19 @@ func (f *Field) GetTile(x, y int) *Tile {
 
 func (f *Field) dfs(x, y int) {
 	t := f.GetTile(x, y)
-	if t == nil || t.Mine || t.State != Closed || !t.Open() {
+	if t == nil || t.Mine || t.State != Closed {
 		return
 	}
+	if t.Adjacent > 0 {
+		if t.Open() {
+			f.remainTiles--
+		}
+		return
+	}
+	if !t.Open() {
+		return
+	}
+
 	f.remainTiles--
 
 	f.dfs(x+1, y)
