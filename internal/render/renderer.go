@@ -3,7 +3,7 @@ package render
 import (
 	"bufio"
 	"fmt"
-	"minesweeper/internal/game"
+	"minesweeper-go/internal/game"
 	"os"
 )
 
@@ -24,7 +24,7 @@ type Renderer struct {
 	term *terminal
 	out  *bufio.Writer
 
-	resetPos string
+	resetCursor string
 }
 
 func NewRenderer(columns, rows int) (*Renderer, error) {
@@ -36,9 +36,9 @@ func NewRenderer(columns, rows int) (*Renderer, error) {
 	fmt.Print(escHideCursor)
 
 	return &Renderer{
-		term:     term,
-		out:      bufio.NewWriterSize(os.Stdout, columns*(rows+1)),
-		resetPos: fmt.Sprintf(escMoveCursorUp+escMoveCursorLeft, rows+1, columns),
+		term:        term,
+		out:         bufio.NewWriterSize(os.Stdout, columns*(rows+1)),
+		resetCursor: fmt.Sprintf(escMoveCursorUp+escMoveCursorLeft, rows+1, columns),
 	}, nil
 }
 
@@ -53,23 +53,23 @@ func (r *Renderer) RenderField(field *game.Field) {
 	}
 	_, _ = r.out.WriteString("\n")
 
-	for row := range field.Rows {
-		for col := range field.Columns {
-			t := field.GetTile(col, row)
-			if field.Cursor.IsSelectedTile(col, row) {
-				_, _ = r.out.WriteString("[")
-				_, _ = r.out.WriteString(t.String())
-				_, _ = r.out.WriteString("]")
-			} else {
-				_, _ = r.out.WriteString(" ")
-				_, _ = r.out.WriteString(t.String())
-				_, _ = r.out.WriteString(" ")
-			}
+	for pos := range field.Iterator() {
+		t := field.GetTile(pos)
+		if field.Cursor.Position == pos {
+			_, _ = r.out.WriteString("[")
+			_, _ = r.out.WriteString(t.String())
+			_, _ = r.out.WriteString("]")
+		} else {
+			_, _ = r.out.WriteString(" ")
+			_, _ = r.out.WriteString(t.String())
+			_, _ = r.out.WriteString(" ")
 		}
-		_, _ = r.out.WriteString("\n")
+		if pos.X == field.Size.X-1 {
+			_, _ = r.out.WriteString("\n")
+		}
 	}
 
-	_, _ = r.out.WriteString(r.resetPos)
+	_, _ = r.out.WriteString(r.resetCursor)
 	_ = r.out.Flush()
 }
 

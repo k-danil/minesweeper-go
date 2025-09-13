@@ -34,7 +34,11 @@ func (t *Tile) String() string {
 		if t.Mine {
 			str = "*"
 		} else {
-			str = strconv.Itoa(int(t.Adjacent))
+			if t.Adjacent == 0 {
+				str = " "
+			} else {
+				str = strconv.Itoa(int(t.Adjacent))
+			}
 		}
 	}
 	return str

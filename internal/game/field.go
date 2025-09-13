@@ -1,8 +1,10 @@
 package game
 
 import (
+	"iter"
 	"math/rand/v2"
-	"minesweeper/internal/utils"
+	"minesweeper-go/internal/utils"
+	"slices"
 )
 
 type FieldState uint8
@@ -27,12 +29,12 @@ const (
 )
 
 type Field struct {
-	State       FieldState
+	State  FieldState
+	Size   utils.Vec2
+	Cursor Cursor
+
 	useDFS      bool
-	Columns     int
-	Rows        int
 	tiles       []Tile
-	Cursor      Cursor
 	mines       int
 	remainTiles int
 }
@@ -40,13 +42,13 @@ type Field struct {
 func NewField(columns, rows int, percent int, useDFS bool) *Field {
 	percent = utils.Clamp(percent, 1, 100)
 	tileCount := columns * rows
+	size := utils.Vec2{X: columns, Y: rows}
 	return &Field{
-		Columns: columns,
-		Rows:    rows,
-		useDFS:  useDFS,
-		tiles:   make([]Tile, tileCount),
-		mines:   tileCount / 100 * percent,
-		Cursor:  Cursor{columns, rows, 0, 0},
+		Size:   size,
+		useDFS: useDFS,
+		tiles:  make([]Tile, tileCount),
+		mines:  tileCount / 100 * percent,
+		Cursor: Cursor{border: size},
 	}
 }
 
@@ -85,16 +87,12 @@ func (f *Field) PushEvent(event FieldEvent) {
 }
 
 func (f *Field) pushTileEvent(event TileEvent) {
-	x, y := f.Cursor.GetPosition()
-
 	if f.useDFS && event == TileOpen {
-		f.dfs(x, y, true)
+		f.dfs(f.Cursor.Position, true)
 	} else {
-		t := f.GetTile(x, y)
-		if t == nil {
-			return
+		if t := f.GetTile(f.Cursor.Position); t != nil {
+			f.PushEvent(t.PushEvent(event))
 		}
-		f.PushEvent(t.PushEvent(event))
 	}
 }
 
@@ -105,16 +103,32 @@ func (f *Field) reset() {
 	f.remainTiles = len(f.tiles) - f.mines
 }
 
-func (f *Field) getSliceIndex(x, y int) int {
-	return x + y*f.Columns
+func (f *Field) getSliceIndex(pos utils.Vec2) int {
+	return pos.X + pos.Y*f.Size.X
 }
 
 func (f *Field) randomize() {
-	cursorIndex := f.getSliceIndex(f.Cursor.GetPosition())
-	for range f.mines {
+	cursorIndex := f.getSliceIndex(f.Cursor.Position)
+	aroundIndexes := make([]int, 0, 9)
+	for nbr := range utils.AroundIterator(f.Cursor.Position) {
+		if f.GetTile(nbr) == nil {
+			continue
+		}
+		aroundIndexes = append(aroundIndexes, f.getSliceIndex(nbr))
+	}
+
+	for m := range f.mines {
 		for {
 			j := rand.IntN(len(f.tiles) - 1)
-			if j == cursorIndex || f.tiles[j].Mine {
+			if f.tiles[j].Mine {
+				continue
+			}
+
+			if len(f.tiles)-m > 9 {
+				if slices.Contains(aroundIndexes, j) {
+					continue
+				}
+			} else if j == cursorIndex {
 				continue
 			}
 
@@ -123,20 +137,15 @@ func (f *Field) randomize() {
 		}
 	}
 
-	for r := range f.Rows {
-		for c := range f.Columns {
-			t := f.GetTile(c, r)
-			if t == nil || !t.Mine {
-				continue
-			}
-			for i, j := range utils.MatrixIterator() {
-				if i == 0 && j == 0 {
-					continue
-				}
-				if adj := f.GetTile(c+i, r+j); adj != nil {
-					if !adj.Mine {
-						adj.Adjacent++
-					}
+	for pos := range f.Iterator() {
+		t := f.GetTile(pos)
+		if t == nil || !t.Mine {
+			continue
+		}
+		for nbr := range utils.AroundIterator(pos) {
+			if nbr != pos {
+				if nbrTile := f.GetTile(nbr); nbrTile != nil && !nbrTile.Mine {
+					nbrTile.Adjacent++
 				}
 			}
 		}
@@ -152,16 +161,28 @@ func (f *Field) openTiles(onlyMines bool) {
 	}
 }
 
-func (f *Field) GetTile(x, y int) *Tile {
-	if x < 0 || x >= f.Columns || y < 0 || y >= f.Rows {
+func (f *Field) Iterator() iter.Seq[utils.Vec2] {
+	return func(yield func(utils.Vec2) bool) {
+		for y := range f.Size.Y {
+			for x := range f.Size.X {
+				if !yield(utils.Vec2{X: x, Y: y}) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func (f *Field) GetTile(pos utils.Vec2) *Tile {
+	if pos.Less(utils.Vec2{}) || pos.GreaterOrEqual(f.Size) {
 		return nil
 	}
 
-	return &f.tiles[f.getSliceIndex(x, y)]
+	return &f.tiles[f.getSliceIndex(pos)]
 }
 
-func (f *Field) dfs(x, y int, first bool) {
-	t := f.GetTile(x, y)
+func (f *Field) dfs(pos utils.Vec2, first bool) {
+	t := f.GetTile(pos)
 	if f.State != Playing || t == nil || (!first && t.Mine) {
 		return
 	}
@@ -172,30 +193,21 @@ func (f *Field) dfs(x, y int, first bool) {
 		return
 	}
 
-	for i, j := range utils.MatrixIterator() {
-		if i == 0 && j == 0 {
-			continue
+	for nbr := range utils.AroundIterator(pos) {
+		if nbr != pos {
+			f.dfs(nbr, false)
 		}
-		f.dfs(x+i, y+j, false)
 	}
 }
 
 type Cursor struct {
-	limitX, limitY int
-	x, y           int
+	Position, border utils.Vec2
 }
 
-func (c *Cursor) Move(x, y int) {
-	c.x += x
-	c.x = utils.Clamp(c.x, 0, c.limitX)
-	c.y += y
-	c.y = utils.Clamp(c.y, 0, c.limitY)
-}
-
-func (c *Cursor) GetPosition() (x int, y int) {
-	return c.x, c.y
-}
-
-func (c *Cursor) IsSelectedTile(x, y int) bool {
-	return c.x == x && c.y == y
+func (c *Cursor) Move(vec2 utils.Vec2) {
+	c.Position = c.Position.Add(vec2)
+	c.Position = utils.Vec2{
+		X: utils.Clamp(c.Position.X, 0, c.border.X),
+		Y: utils.Clamp(c.Position.Y, 0, c.border.Y),
+	}
 }

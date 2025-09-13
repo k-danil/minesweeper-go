@@ -3,8 +3,9 @@ package main
 import (
 	"flag"
 	"log"
-	"minesweeper/internal/game"
-	"minesweeper/internal/render"
+	"minesweeper-go/internal/game"
+	"minesweeper-go/internal/render"
+	"minesweeper-go/internal/utils"
 	"os"
 )
 
@@ -53,13 +54,13 @@ func main() {
 		case "r":
 			f.PushEvent(game.FieldReset)
 		case "w", cursorUp:
-			f.Cursor.Move(0, -1)
+			f.Cursor.Move(utils.Vec2{Y: -1})
 		case "s", cursorDown:
-			f.Cursor.Move(0, 1)
+			f.Cursor.Move(utils.Vec2{Y: 1})
 		case "a", cursorLeft:
-			f.Cursor.Move(-1, 0)
+			f.Cursor.Move(utils.Vec2{X: -1})
 		case "d", cursorRight:
-			f.Cursor.Move(1, 0)
+			f.Cursor.Move(utils.Vec2{X: 1})
 		case "f":
 			f.PushEvent(game.FieldFlag)
 		case " ":

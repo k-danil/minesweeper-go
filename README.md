@@ -2,6 +2,8 @@
 
 A simple terminal Minesweeper implemented in Go. The game renders directly to your terminal, supports keyboard navigation (WASD or arrow keys), flagging, and a DFS-based "simple" opening mode.
 
+Influenced by **tsoding** implementation: https://github.com/tsoding/mine.
+
 
 ## Requirements
 - Go 1.24+ (module sets toolchain to go1.24.6)
