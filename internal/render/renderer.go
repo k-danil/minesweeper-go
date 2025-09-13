@@ -11,7 +11,7 @@ const (
 )
 
 func RenderField(field *game.Field) {
-	switch field.GetState() {
+	switch field.State {
 	case game.Win:
 		fmt.Println("You win!")
 	case game.Loose:
@@ -23,7 +23,7 @@ func RenderField(field *game.Field) {
 	for r := range field.Rows {
 		for c := range field.Columns {
 			t := field.GetTile(c, r)
-			if field.Cursor.IsCurrentTile(c, r) {
+			if field.Cursor.IsSelectedTile(c, r) {
 				fmt.Printf(cellCursor, t.String())
 			} else {
 				fmt.Printf(cellNoCursor, t.String())

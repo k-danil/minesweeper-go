@@ -2,18 +2,25 @@ package game
 
 import "fmt"
 
-type State int
+type TileState uint8
 
 const (
-	Closed State = iota
-	Open
+	Closed TileState = iota
+	Opened
 	Flagged
 )
 
+type TileEvent uint8
+
+const (
+	TileFlag TileEvent = iota
+	TileOpen
+)
+
 type Tile struct {
-	State    State
+	State    TileState
 	Mine     bool
-	Adjacent int
+	Adjacent uint8
 }
 
 func (t *Tile) String() string {
@@ -23,7 +30,7 @@ func (t *Tile) String() string {
 		str = "."
 	case Flagged:
 		str = "F"
-	case Open:
+	case Opened:
 		if t.Mine {
 			str = "*"
 		} else {
@@ -33,24 +40,25 @@ func (t *Tile) String() string {
 	return str
 }
 
-func (t *Tile) Flag() {
+func (t *Tile) PushEvent(event TileEvent) FieldEvent {
 	switch t.State {
 	case Flagged:
-		t.State = Closed
+		if event == TileFlag {
+			t.State = Closed
+		}
 	case Closed:
-		t.State = Flagged
+		switch event {
+		case TileFlag:
+			t.State = Flagged
+		case TileOpen:
+			t.State = Opened
+			if t.Mine {
+				return fieldTileMine
+			} else {
+				return fieldTileClean
+			}
+		}
 	default:
 	}
-
-	return
-}
-
-func (t *Tile) Open() bool {
-	switch t.State {
-	case Closed:
-		t.State = Open
-		return true
-	default:
-	}
-	return false
+	return fieldTileNoop
 }

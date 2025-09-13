@@ -1,22 +1,34 @@
 package game
 
 import (
-	"log"
 	"math/rand/v2"
+	"minesweeper/internal/utils"
 )
 
-type FieldState int
+type FieldState uint8
 
 const (
 	Init FieldState = iota
-	Generate
 	Playing
 	Win
 	Loose
 )
 
+type FieldEvent uint8
+
+const (
+	FieldReset FieldEvent = iota
+	FieldFlag
+	FieldAction
+
+	fieldTileNoop
+	fieldTileClean
+	fieldTileMine
+)
+
 type Field struct {
 	State       FieldState
+	useDFS      bool
 	Columns     int
 	Rows        int
 	tiles       []Tile
@@ -25,54 +37,64 @@ type Field struct {
 	remainTiles int
 }
 
-func NewField(columns, rows int, percent int) *Field {
-	percent = clamp(percent, 1, 100)
+func NewField(columns, rows int, percent int, useDFS bool) *Field {
+	percent = utils.Clamp(percent, 1, 100)
 	tileCount := columns * rows
 	return &Field{
 		Columns: columns,
 		Rows:    rows,
+		useDFS:  useDFS,
 		tiles:   make([]Tile, tileCount),
 		mines:   tileCount / 100 * percent,
 		Cursor:  Cursor{columns, rows, 0, 0},
 	}
 }
 
-func (f *Field) GetState() FieldState {
-	currentState := f.State
-	switch f.State {
-	case Init:
+func (f *Field) PushEvent(event FieldEvent) {
+	switch {
+	case event == FieldReset:
 		f.reset()
-	case Loose:
+		f.State = Init
+
+	case event == FieldFlag && f.State == Playing:
+		f.pushTileEvent(TileFlag)
+
+	case event == FieldAction && (f.State == Win || f.State == Loose):
+		f.PushEvent(FieldReset)
+
+	case event == FieldAction && f.State == Init:
+		f.randomize()
+		f.State = Playing
+		fallthrough
+
+	case event == FieldAction && f.State == Playing:
+		f.pushTileEvent(TileOpen)
+
+	case event == fieldTileClean && f.State == Playing:
+		f.remainTiles--
+		if f.remainTiles == 0 {
+			f.openTiles(false)
+			f.State = Win
+		}
+
+	case event == fieldTileMine && f.State == Playing:
 		f.openTiles(true)
-	case Win:
-		f.openTiles(false)
-	default:
+		f.State = Loose
+
 	}
-	return currentState
 }
 
-func (f *Field) AdvanceState(x, y int, useDFS bool) {
-	t := f.GetTile(x, y)
-	if t == nil {
-		return
-	}
+func (f *Field) pushTileEvent(event TileEvent) {
+	x, y := f.Cursor.GetPosition()
 
-	switch f.State {
-	case Playing:
-		if t.Mine {
-			f.State = Loose
-		} else {
-			if useDFS {
-				f.dfs(x, y)
-			} else if t.Open() {
-				f.remainTiles--
-			}
-
-			if f.remainTiles == 0 {
-				f.State = Win
-			}
+	if f.useDFS && event == TileOpen {
+		f.dfs(x, y, true)
+	} else {
+		t := f.GetTile(x, y)
+		if t == nil {
+			return
 		}
-	default:
+		f.PushEvent(t.PushEvent(event))
 	}
 }
 
@@ -87,21 +109,38 @@ func (f *Field) getSliceIndex(x, y int) int {
 	return x + y*f.Columns
 }
 
-func (f *Field) Randomize() {
+func (f *Field) randomize() {
 	cursorIndex := f.getSliceIndex(f.Cursor.GetPosition())
 	for range f.mines {
 		for {
 			j := rand.IntN(len(f.tiles) - 1)
-			if j == cursorIndex {
+			if j == cursorIndex || f.tiles[j].Mine {
 				continue
 			}
-			if !f.tiles[j].Mine {
-				f.tiles[j].Mine = true
-				break
+
+			f.tiles[j].Mine = true
+			break
+		}
+	}
+
+	for r := range f.Rows {
+		for c := range f.Columns {
+			t := f.GetTile(c, r)
+			if t == nil || !t.Mine {
+				continue
+			}
+			for i, j := range utils.GetMatrixIterator() {
+				if i == 0 && j == 0 {
+					continue
+				}
+				if adj := f.GetTile(c+i, r+j); adj != nil {
+					if !adj.Mine {
+						adj.Adjacent++
+					}
+				}
 			}
 		}
 	}
-	f.calculateAdjacent()
 }
 
 func (f *Field) openTiles(onlyMines bool) {
@@ -109,29 +148,7 @@ func (f *Field) openTiles(onlyMines bool) {
 		if onlyMines && !f.tiles[i].Mine {
 			continue
 		}
-		f.tiles[i].State = Open
-	}
-}
-
-func (f *Field) calculateAdjacent() {
-	for r := range f.Rows {
-		for c := range f.Columns {
-			t := f.GetTile(c, r)
-			if t == nil {
-				log.Fatal("Tile is nil")
-			}
-			for i := -1; i <= 1; i++ {
-				for j := -1; j <= 1; j++ {
-					if i == 0 && j == 0 {
-						continue
-					}
-					adj := f.GetTile(c+i, r+j)
-					if adj != nil && adj.Mine {
-						t.Adjacent++
-					}
-				}
-			}
-		}
+		f.tiles[i].State = Opened
 	}
 }
 
@@ -143,30 +160,23 @@ func (f *Field) GetTile(x, y int) *Tile {
 	return &f.tiles[f.getSliceIndex(x, y)]
 }
 
-func (f *Field) dfs(x, y int) {
+func (f *Field) dfs(x, y int, first bool) {
 	t := f.GetTile(x, y)
-	if t == nil || t.Mine || t.State != Closed {
-		return
-	}
-	if t.Adjacent > 0 {
-		if t.Open() {
-			f.remainTiles--
-		}
-		return
-	}
-	if !t.Open() {
+	if f.State != Playing || t == nil || (!first && t.Mine) {
 		return
 	}
 
-	f.remainTiles--
+	fieldEvent := t.PushEvent(TileOpen)
+	f.PushEvent(fieldEvent)
+	if t.Adjacent > 0 || fieldEvent != fieldTileClean {
+		return
+	}
 
-	for i := -1; i <= 1; i++ {
-		for j := -1; j <= 1; j++ {
-			if i == 0 && j == 0 {
-				continue
-			}
-			f.dfs(x+i, y+j)
+	for i, j := range utils.GetMatrixIterator() {
+		if i == 0 && j == 0 {
+			continue
 		}
+		f.dfs(x+i, y+j, false)
 	}
 }
 
@@ -177,24 +187,15 @@ type Cursor struct {
 
 func (c *Cursor) Move(x, y int) {
 	c.x += x
-	c.x = clamp(c.x, 0, c.limitX)
+	c.x = utils.Clamp(c.x, 0, c.limitX)
 	c.y += y
-	c.y = clamp(c.y, 0, c.limitY)
-}
-
-func clamp(a, min, max int) int {
-	if a < min {
-		a = min
-	} else if a >= max {
-		a = max - 1
-	}
-	return a
+	c.y = utils.Clamp(c.y, 0, c.limitY)
 }
 
 func (c *Cursor) GetPosition() (x int, y int) {
 	return c.x, c.y
 }
 
-func (c *Cursor) IsCurrentTile(x, y int) bool {
+func (c *Cursor) IsSelectedTile(x, y int) bool {
 	return c.x == x && c.y == y
 }

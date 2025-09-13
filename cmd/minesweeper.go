@@ -22,7 +22,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	f := game.NewField(*columns, *rows, *percent)
+	f := game.NewField(*columns, *rows, *percent, *simple)
 
 	terminal, err := render.InitTerminal()
 	if err != nil {
@@ -33,10 +33,7 @@ func main() {
 	cmd := make([]byte, 3)
 
 	for {
-		if f.GetState() == game.Init {
-			render.RenderField(f)
-			f.State = game.Generate
-		}
+		render.RenderField(f)
 
 		var l int
 		if l, err = os.Stdin.Read(cmd); err != nil {
@@ -46,32 +43,20 @@ func main() {
 		switch string(cmd[:l]) {
 		case "q", "\x1b":
 			os.Exit(0)
+		case "r":
+			f.PushEvent(game.FieldReset)
 		case "w", "\x1b[A":
 			f.Cursor.Move(0, -1)
 		case "s", "\x1b[B":
 			f.Cursor.Move(0, 1)
-		case "d", "\x1b[C":
-			f.Cursor.Move(1, 0)
 		case "a", "\x1b[D":
 			f.Cursor.Move(-1, 0)
+		case "d", "\x1b[C":
+			f.Cursor.Move(1, 0)
 		case "f":
-			t := f.GetTile(f.Cursor.GetPosition())
-			t.Flag()
+			f.PushEvent(game.FieldFlag)
 		case " ":
-			switch f.GetState() {
-			case game.Loose, game.Win:
-				f.State = game.Init
-			case game.Generate:
-				f.Randomize()
-				f.State = game.Playing
-				fallthrough
-			case game.Playing:
-				x, y := f.Cursor.GetPosition()
-				f.AdvanceState(x, y, *simple)
-			default:
-			}
-		default:
+			f.PushEvent(game.FieldAction)
 		}
-		render.RenderField(f)
 	}
 }
