@@ -1,6 +1,6 @@
 package game
 
-import "fmt"
+import "strconv"
 
 type TileState uint8
 
@@ -34,31 +34,27 @@ func (t *Tile) String() string {
 		if t.Mine {
 			str = "*"
 		} else {
-			str = fmt.Sprintf("%d", t.Adjacent)
+			str = strconv.Itoa(int(t.Adjacent))
 		}
 	}
 	return str
 }
 
 func (t *Tile) PushEvent(event TileEvent) FieldEvent {
-	switch t.State {
-	case Flagged:
-		if event == TileFlag {
-			t.State = Closed
+	switch {
+	case t.State == Flagged && event == TileFlag:
+		t.State = Closed
+
+	case t.State == Closed && event == TileFlag:
+		t.State = Flagged
+
+	case t.State == Closed && event == TileOpen:
+		t.State = Opened
+		if t.Mine {
+			return fieldTileMine
+		} else {
+			return fieldTileClean
 		}
-	case Closed:
-		switch event {
-		case TileFlag:
-			t.State = Flagged
-		case TileOpen:
-			t.State = Opened
-			if t.Mine {
-				return fieldTileMine
-			} else {
-				return fieldTileClean
-			}
-		}
-	default:
 	}
 	return fieldTileNoop
 }

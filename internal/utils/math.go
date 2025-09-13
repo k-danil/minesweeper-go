@@ -11,11 +11,11 @@ func Clamp(a, min, max int) int {
 	return a
 }
 
-// GetMatrixIterator returns a function that iterates over the matrix
+// MatrixIterator returns a function that iterates over the matrix
 // (-1, -1) (-1, 0) (-1, 1)
 // ( 0, -1) ( 0, 0) ( 0, 1)
 // ( 1, -1) ( 1, 0) ( 1, 1)
-func GetMatrixIterator() iter.Seq2[int, int] {
+func MatrixIterator() iter.Seq2[int, int] {
 	return func(yield func(int, int) bool) {
 		for i := -1; i <= 1; i++ {
 			for j := -1; j <= 1; j++ {

@@ -8,6 +8,14 @@ import (
 	"os"
 )
 
+const (
+	cursorUp    = "\x1b[A"
+	cursorDown  = "\x1b[B"
+	cursorLeft  = "\x1b[D"
+	cursorRight = "\x1b[C"
+	escape      = "\x1b"
+)
+
 func main() {
 	rows := flag.Int("rows", 15, "Row count")
 	columns := flag.Int("columns", 15, "Column count")
@@ -23,17 +31,16 @@ func main() {
 	}
 
 	f := game.NewField(*columns, *rows, *percent, *simple)
-
-	terminal, err := render.InitTerminal()
+	r, err := render.NewRenderer(*columns, *rows)
 	if err != nil {
-		log.Fatal("Error initializing terminal: ", err)
+		log.Fatal("Error initializing renderer: ", err)
 	}
-	defer func() { _ = terminal.Restore() }()
+	defer func() { _ = r.Close() }()
 
 	cmd := make([]byte, 3)
 
 	for {
-		render.RenderField(f)
+		r.RenderField(f)
 
 		var l int
 		if l, err = os.Stdin.Read(cmd); err != nil {
@@ -41,17 +48,17 @@ func main() {
 		}
 
 		switch string(cmd[:l]) {
-		case "q", "\x1b":
-			os.Exit(0)
+		case "q", escape:
+			return
 		case "r":
 			f.PushEvent(game.FieldReset)
-		case "w", "\x1b[A":
+		case "w", cursorUp:
 			f.Cursor.Move(0, -1)
-		case "s", "\x1b[B":
+		case "s", cursorDown:
 			f.Cursor.Move(0, 1)
-		case "a", "\x1b[D":
+		case "a", cursorLeft:
 			f.Cursor.Move(-1, 0)
-		case "d", "\x1b[C":
+		case "d", cursorRight:
 			f.Cursor.Move(1, 0)
 		case "f":
 			f.PushEvent(game.FieldFlag)

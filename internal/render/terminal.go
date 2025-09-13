@@ -6,13 +6,13 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-type Terminal struct {
+type terminal struct {
 	fd    int
 	state unix.Termios
 }
 
-func InitTerminal() (*Terminal, error) {
-	ret := &Terminal{fd: int(os.Stdin.Fd())}
+func initTerminal() (*terminal, error) {
+	ret := &terminal{fd: int(os.Stdin.Fd())}
 
 	termiosPtr, err := unix.IoctlGetTermios(ret.fd, unix.TIOCGETA)
 	if err != nil {
@@ -32,6 +32,6 @@ func InitTerminal() (*Terminal, error) {
 	return ret, nil
 }
 
-func (t *Terminal) Restore() error {
+func (t *terminal) restore() error {
 	return unix.IoctlSetTermios(t.fd, unix.TIOCSETA, &t.state)
 }

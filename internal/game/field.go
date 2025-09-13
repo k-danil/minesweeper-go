@@ -11,7 +11,7 @@ const (
 	Init FieldState = iota
 	Playing
 	Win
-	Loose
+	Lose
 )
 
 type FieldEvent uint8
@@ -59,13 +59,13 @@ func (f *Field) PushEvent(event FieldEvent) {
 	case event == FieldFlag && f.State == Playing:
 		f.pushTileEvent(TileFlag)
 
-	case event == FieldAction && (f.State == Win || f.State == Loose):
+	case event == FieldAction && (f.State == Win || f.State == Lose):
 		f.PushEvent(FieldReset)
 
 	case event == FieldAction && f.State == Init:
 		f.randomize()
 		f.State = Playing
-		fallthrough
+		f.PushEvent(event)
 
 	case event == FieldAction && f.State == Playing:
 		f.pushTileEvent(TileOpen)
@@ -79,7 +79,7 @@ func (f *Field) PushEvent(event FieldEvent) {
 
 	case event == fieldTileMine && f.State == Playing:
 		f.openTiles(true)
-		f.State = Loose
+		f.State = Lose
 
 	}
 }
@@ -129,7 +129,7 @@ func (f *Field) randomize() {
 			if t == nil || !t.Mine {
 				continue
 			}
-			for i, j := range utils.GetMatrixIterator() {
+			for i, j := range utils.MatrixIterator() {
 				if i == 0 && j == 0 {
 					continue
 				}
@@ -172,7 +172,7 @@ func (f *Field) dfs(x, y int, first bool) {
 		return
 	}
 
-	for i, j := range utils.GetMatrixIterator() {
+	for i, j := range utils.MatrixIterator() {
 		if i == 0 && j == 0 {
 			continue
 		}
