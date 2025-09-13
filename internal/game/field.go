@@ -42,13 +42,15 @@ type Field struct {
 func NewField(columns, rows int, percent int, useDFS bool) *Field {
 	percent = utils.Clamp(percent, 1, 100)
 	tileCount := columns * rows
+	mines := tileCount / 100 * percent
 	size := utils.Vec2{X: columns, Y: rows}
 	return &Field{
-		Size:   size,
-		useDFS: useDFS,
-		tiles:  make([]Tile, tileCount),
-		mines:  tileCount / 100 * percent,
-		Cursor: Cursor{border: size},
+		Size:        size,
+		useDFS:      useDFS,
+		tiles:       make([]Tile, tileCount),
+		mines:       mines,
+		remainTiles: tileCount - mines,
+		Cursor:      Cursor{border: size},
 	}
 }
 
