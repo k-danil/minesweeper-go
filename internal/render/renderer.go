@@ -10,21 +10,20 @@ import (
 const (
 	escHideCursor     = "\x1b[?25l"
 	escShowCursor     = "\x1b[?25h"
-	escMoveCursorUp   = "\x1b[%dA"
-	escMoveCursorLeft = "\x1b[%dD"
+	escCursorPosition = "\x1b[%d;%dH"
+	escClearScreen    = "\x1b[%dJ"
 )
 
 const (
 	statusWin  = "You win!"
 	statusLose = "You lose!"
-	statusInit = "          "
 )
 
 type Renderer struct {
 	term *terminal
 	out  *bufio.Writer
 
-	resetCursor string
+	resetTerminal string
 }
 
 func NewRenderer(columns, rows int) (*Renderer, error) {
@@ -35,21 +34,25 @@ func NewRenderer(columns, rows int) (*Renderer, error) {
 	}
 	fmt.Print(escHideCursor)
 
+	resetTerminal := fmt.Sprintf(escCursorPosition, 0, 0)
+	resetTerminal += fmt.Sprintf(escClearScreen, 0)
+	fmt.Print(resetTerminal)
+
 	return &Renderer{
-		term:        term,
-		out:         bufio.NewWriterSize(os.Stdout, columns*(rows+1)),
-		resetCursor: fmt.Sprintf(escMoveCursorUp+escMoveCursorLeft, rows+1, columns),
+		term:          term,
+		out:           bufio.NewWriterSize(os.Stdout, columns*(rows+1)),
+		resetTerminal: resetTerminal,
 	}, nil
 }
 
 func (r *Renderer) RenderField(field *game.Field) {
+	_, _ = r.out.WriteString(r.resetTerminal)
+
 	switch field.State {
 	case game.Win:
 		_, _ = r.out.WriteString(statusWin)
 	case game.Lose:
 		_, _ = r.out.WriteString(statusLose)
-	default:
-		_, _ = r.out.WriteString(statusInit)
 	}
 	_, _ = r.out.WriteString("\n")
 
@@ -69,7 +72,6 @@ func (r *Renderer) RenderField(field *game.Field) {
 		}
 	}
 
-	_, _ = r.out.WriteString(r.resetCursor)
 	_ = r.out.Flush()
 }
 
